@@ -26,7 +26,8 @@ class VehicleDetector:
             conf=self.confidence,
             classes=self.vehicle_classes,
             imgsz=self.imgsz,
-            verbose=False
+            verbose=False,
+
         )[0]
 
         detections = []

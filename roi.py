@@ -1,63 +1,53 @@
-# run_roi_picker.py
-import cv2
 import yaml
+import cv2
+import numpy as np
+from shapely.geometry import Polygon, Point
 
-points = []
-DISPLAY_WIDTH = 900  # adjust this to fit your screen
+class ROIZone:
+    def __init__(self, config_path="config.yaml"):
+        with open(config_path) as f:
+            cfg = yaml.safe_load(f)
 
-def click(event, x, y, flags, param):
-    scale = param["scale"]
-    if event == cv2.EVENT_LBUTTONDOWN:
-        # Convert display coords back to original coords
-        real_x = int(x / scale)
-        real_y = int(y / scale)
-        points.append([real_x, real_y])
-        print(f"Point added: ({real_x}, {real_y})")
-        cv2.circle(display_frame, (x, y), 6, (0, 255, 0), -1)
-        if len(points) > 1:
-            dx, dy = int(points[-2][0] * scale), int(points[-2][1] * scale)
-            cv2.line(display_frame, (dx, dy), (x, y), (0, 255, 0), 2)
-        cv2.imshow("Pick ROI - press Q when done", display_frame)
+        self.zone_points = cfg["roi"]["zone"]                  # list of [x, y] pairs
+        self.polygon     = Polygon(self.zone_points)           # Shapely polygon for checks
+        self.np_points   = np.array(self.zone_points, np.int32)  # NumPy array for drawing
 
-with open("config.yaml") as f:
-    cfg = yaml.safe_load(f)
+    def is_inside(self, x1, y1, x2, y2):
+        """
+        Check if a bounding box is inside the ROI.
+        Uses the bottom-center of the box as the vehicle's ground contact point.
+        This is more accurate than centroid for vehicles on a road.
+        """
+        bottom_center_x = (x1 + x2) // 2
+        bottom_center_y = y2          # bottom edge of bounding box
 
-source = cfg["video"]["source"]
-cap = cv2.VideoCapture(source)
+        point = Point(bottom_center_x, bottom_center_y)
+        return self.polygon.contains(point)
 
-# Skip to middle of video for a better reference frame
-total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-cap.set(cv2.CAP_PROP_POS_FRAMES, total_frames // 2)
+    def get_bottom_center(self, x1, y1, x2, y2):
+        """Returns the ground contact point of a bounding box."""
+        return ((x1 + x2) // 2, y2)
 
-ret, frame = cap.read()
-cap.release()
+    def draw(self, frame, any_violation=False):
+        """
+        Draw the ROI zone on the frame.
+        Turns red if any vehicle is violating.
+        """
+        overlay = frame.copy()
 
-if not ret:
-    print("ERROR: Could not read frame from video.")
-    exit()
+        # Filled polygon (semi-transparent)
+        fill_color = (0, 0, 180) if any_violation else (0, 180, 0)
+        cv2.fillPoly(overlay, [self.np_points], fill_color)
+        cv2.addWeighted(overlay, 0.25, frame, 0.75, 0, frame)
 
-# Scale down to fit screen
-h, w = frame.shape[:2]
-scale = DISPLAY_WIDTH / w
-display_h = int(h * scale)
-display_frame = cv2.resize(frame, (DISPLAY_WIDTH, display_h))
+        # Polygon border
+        border_color = (0, 0, 255) if any_violation else (0, 255, 0)
+        cv2.polylines(frame, [self.np_points], isClosed=True, color=border_color, thickness=2)
 
-print(f"Original resolution: {w}x{h}")
-print(f"Display resolution:  {DISPLAY_WIDTH}x{display_h}  (scale: {scale:.2f})")
-print("Click the corners of your no-parking zone in order, then press Q")
+        # Zone label
+        label     = "NO PARKING ZONE"
+        label_pos = (self.np_points[:, 0].min(), self.np_points[:, 1].min() - 10)
+        cv2.putText(frame, label, label_pos,
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, border_color, 2)
 
-cv2.imshow("Pick ROI - press Q when done", display_frame)
-cv2.setMouseCallback("Pick ROI - press Q when done", click, {"scale": scale})
-
-while True:
-    if cv2.waitKey(1) & 0xFF == ord('q'):
-        break
-
-cv2.destroyAllWindows()
-
-if len(points) < 3:
-    print("Need at least 3 points to define a zone.")
-else:
-    print(f"\nYour zone coordinates (already scaled to original resolution):")
-    print(points)
-    print("\nPaste these into config.yaml under roi.zone")
+        return frame
