@@ -1,0 +1,25 @@
+video:
+  source: "data/sample_video.mp4"  # path to your video
+  fps: 30
+
+detection:
+  model: "yolov8m.pt"       # yolov8n.pt for faster, yolov8m.pt for more accurate
+  confidence: 0.4
+  vehicle_classes: [2, 3, 5, 7]  # car, motorcycle, bus, truck (COCO IDs)
+  imgsz: 640
+
+tracking:
+  max_age: 30               # frames before a lost track is deleted
+
+roi:
+  # Polygon corners of your no-parking zone (pixel coordinates)
+  # You'll update these after picking them from your actual video
+  zone: [[2585, 814], [2794, 810], [3746, 1595], [3161, 1651], [2585, 810]]
+
+violation:
+  time_threshold_seconds: 30   # how long before it's a violation
+
+output:
+  save_video: true
+  output_path: "data/output.mp4"
+  log_path: "data/violations.csv"
