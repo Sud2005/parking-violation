@@ -19,7 +19,7 @@ roi:
   zone: [[2585, 814], [2794, 810], [3746, 1595], [3161, 1651], [2585, 810]]
 
 violation:
-  time_threshold_seconds: 30   # how long before it's a violation
+  time_threshold_seconds: 5 # how long before it's a violation
 
 output:
   save_video: true
