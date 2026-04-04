@@ -9,7 +9,9 @@ detection:
   imgsz: 640
 
 tracking:
-  max_age: 30               # frames before a lost track is deleted
+  max_age: 30
+  n_init: 3            # increase to 5 if ghost tracks appear on empty road
+  max_cosine_distance: 0.3 # frames before a lost track is deleted
 
 roi:
   # Polygon corners of your no-parking zone (pixel coordinates)
